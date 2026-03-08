@@ -119,6 +119,7 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 		Threads:  viper.GetInt(consts.FlagThreads),
 		Iter:     it,
 		Progress: newProgress(dlProgress, it, opts),
+		 Stdout:   opts.Stdout,
 	}
 	limit := viper.GetInt(consts.FlagLimit)
 
