@@ -69,6 +69,9 @@ func NewDownload() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.Serve, "serve", false, "serve the media files as a http server instead of downloading them with built-in downloader")
 	cmd.Flags().IntVar(&opts.Port, "port", 8080, "http server port")
 
+	// ===== 新增：添加 --stdout 标志 =====
+	cmd.Flags().BoolVar(&opts.Stdout, "stdout", false, "output to stdout instead of saving to file (for streaming)")
+
 	_ = viper.BindPFlag(consts.FlagDlTemplate, cmd.Flags().Lookup(consts.FlagDlTemplate))
 
 	// completion and validation
