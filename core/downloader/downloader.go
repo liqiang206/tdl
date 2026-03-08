@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"context"
+	"os" // 需要添加这个导入
 
 	"github.com/go-faster/errors"
 	"github.com/gotd/td/telegram/downloader"
@@ -25,6 +26,8 @@ type Options struct {
 	Threads  int
 	Iter     Iter
 	Progress Progress
+	// ===== 新增字段 =====
+	Stdout   bool // 是否输出到 stdout
 }
 
 func New(opts Options) *Downloader {
@@ -85,13 +88,35 @@ func (d *Downloader) download(ctx context.Context, elem Elem) error {
 		client = d.opts.Pool.Takeout(ctx, elem.File().DC())
 	}
 
+	// ===== 关键修改：根据 Stdout 选项选择不同的 writer =====
+	var writer downloader.WriteAtFunc
+	if d.opts.Stdout {
+		writer = newStdoutWriteAt(elem, d.opts.Progress, MaxPartSize)
+	} else {
+		writer = newWriteAt(elem, d.opts.Progress, MaxPartSize)
+	}
+
 	_, err := downloader.NewDownloader().WithPartSize(MaxPartSize).
 		Download(client, elem.File().Location()).
 		WithThreads(tutil.BestThreads(elem.File().Size(), d.opts.Threads)).
-		Parallel(ctx, newWriteAt(elem, d.opts.Progress, MaxPartSize))
+		Parallel(ctx, writer)
 	if err != nil {
 		return errors.Wrap(err, "download")
 	}
 
 	return nil
+}
+
+// ===== 新增：stdout writer 函数 =====
+// newStdoutWriteAt 创建一个写入标准输出的 WriteAt 函数
+func newStdoutWriteAt(elem Elem, prog Progress, partSize int) downloader.WriteAtFunc {
+	return func(p []byte, offset int64) (n int, err error) {
+		// 直接写入标准输出
+		n, err = os.Stdout.Write(p)
+		if err == nil {
+			// 更新进度
+			prog.OnWrite(elem, partSize, n)
+		}
+		return n, err
+	}
 }
