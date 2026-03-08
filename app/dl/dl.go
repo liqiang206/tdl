@@ -37,7 +37,7 @@ type Options struct {
 	Exclude    []string
 	Desc       bool
 	Takeout    bool
-	Group      bool // auto detect grouped message
+	Group      bool
 
 	// resume opts
 	Continue, Restart bool
@@ -45,6 +45,9 @@ type Options struct {
 	// serve
 	Serve bool
 	Port  int
+
+	// ===== 新增字段 =====
+	Stdout bool // 是否输出到标准输出
 }
 
 type parser struct {
@@ -66,19 +69,7 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 	if err != nil {
 		return err
 	}
-    if opts.Stdout {
-        totalFiles := 0
-        for _, d := range dialogs {
-            totalFiles += len(d.Messages)
-        }
-        if totalFiles > 1 {
-            return fmt.Errorf("stdout mode only supports single file download, but found %d files", totalFiles)
-        }
-        if totalFiles == 0 {
-            return fmt.Errorf("no files found to download")
-        }
-    }
-	
+
 	logctx.From(ctx).Debug("Collect dialogs",
 		zap.Any("dialogs", dialogs))
 
@@ -92,6 +83,17 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 	if err != nil {
 		return err
 	}
+
+	// ===== 新增：使用 Total() 方法检查 stdout 模式下的文件数量 =====
+	if opts.Stdout {
+		if it.Total() > 1 {
+			return fmt.Errorf("stdout mode only supports single file download, but found %d files", it.Total())
+		}
+		if it.Total() == 0 {
+			return fmt.Errorf("no files found to download")
+		}
+	}
+	// ===========================================================
 
 	if !opts.Restart {
 		// resume download and ask user to continue
@@ -119,7 +121,8 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 		Threads:  viper.GetInt(consts.FlagThreads),
 		Iter:     it,
 		Progress: newProgress(dlProgress, it, opts),
-		 Stdout:   opts.Stdout,
+		// ===== 新增：传递 Stdout 选项 =====
+		Stdout:   opts.Stdout,
 	}
 	limit := viper.GetInt(consts.FlagLimit)
 
@@ -130,7 +133,11 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 		zap.Int("threads", options.Threads),
 		zap.Int("limit", limit))
 
-	color.Green("All files will be downloaded to '%s' dir", opts.Dir)
+	if !opts.Stdout {
+		color.Green("All files will be downloaded to '%s' dir", opts.Dir)
+	} else {
+		color.Green("Streaming file to stdout")
+	}
 
 	go dlProgress.Render()
 	defer func() {
