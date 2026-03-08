@@ -66,6 +66,19 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 	if err != nil {
 		return err
 	}
+    if opts.Stdout {
+        totalFiles := 0
+        for _, d := range dialogs {
+            totalFiles += len(d.Messages)
+        }
+        if totalFiles > 1 {
+            return fmt.Errorf("stdout mode only supports single file download, but found %d files", totalFiles)
+        }
+        if totalFiles == 0 {
+            return fmt.Errorf("no files found to download")
+        }
+    }
+	
 	logctx.From(ctx).Debug("Collect dialogs",
 		zap.Any("dialogs", dialogs))
 
